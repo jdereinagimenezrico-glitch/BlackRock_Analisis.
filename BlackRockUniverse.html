@@ -1,0 +1,1094 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BlackRock — El Sistema</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Space+Mono:wght@400;700&family=Inter:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,700;0,900;1,700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --black:#02020a; --deep:#06060f; --surf:#0c0d1a; --s2:#11121f;
+  --gold:#c9a84c;  --gold2:rgba(201,168,76,.18); --goldglow:rgba(201,168,76,.4);
+  --red:#c03030;   --red2:rgba(192,48,48,.14);
+  --cyan:#3ec9c9;
+  --white:#f2f2f2; --muted:rgba(242,242,242,.55); --muted2:rgba(242,242,242,.2);
+  --border:rgba(255,255,255,.08); --border2:rgba(255,255,255,.14);
+  --fd:'Syne',sans-serif; --fm:'Space Mono',monospace;
+  --fb:'Inter',sans-serif; --fp:'Playfair Display',serif;
+}
+html,body{width:100%;height:100%;overflow:hidden;background:var(--black);color:var(--white);font-family:var(--fb);cursor:none}
+::selection{background:var(--gold2);color:var(--gold)}
+
+/* CURSOR */
+#cdot{position:fixed;width:6px;height:6px;background:var(--gold);border-radius:50%;pointer-events:none;z-index:9999;transform:translate(-50%,-50%);mix-blend-mode:screen}
+#cring{position:fixed;width:26px;height:26px;border:1px solid rgba(201,168,76,.5);border-radius:50%;pointer-events:none;z-index:9998;transform:translate(-50%,-50%);transition:width .15s,height .15s,border-color .15s}
+
+/* PROGRESS */
+#prog{position:fixed;top:0;left:0;height:2px;background:linear-gradient(to right,var(--gold),var(--cyan));z-index:600;width:0%;transition:width .15s}
+
+/* TOP NAV */
+#topnav{position:fixed;top:0;left:0;right:0;z-index:500;display:flex;align-items:center;justify-content:space-between;padding:18px 44px;background:linear-gradient(to bottom,rgba(2,2,10,.97) 0%,rgba(2,2,10,.6) 60%,transparent 100%)}
+.nav-logo{font-family:var(--fd);font-weight:800;font-size:13px;letter-spacing:.2em;text-transform:uppercase}
+.nav-logo em{color:var(--gold);font-style:normal}
+#nav-sname{font-family:var(--fm);font-size:8px;letter-spacing:.16em;color:var(--muted)}
+
+/* NAV DOTS */
+#navdots{position:fixed;right:16px;top:50%;transform:translateY(-50%);z-index:500;display:flex;flex-direction:column;gap:9px}
+.ndot{width:5px;height:5px;border-radius:50%;background:var(--muted2);cursor:pointer;transition:all .3s;border:1px solid transparent}
+.ndot:hover{background:var(--muted)}
+.ndot.on{background:var(--gold);box-shadow:0 0 8px var(--goldglow);border-color:rgba(201,168,76,.4)}
+
+/* SLIDE COUNTER */
+#slidectr{position:fixed;bottom:26px;right:44px;z-index:500;font-family:var(--fm);font-size:9px;letter-spacing:.18em;color:var(--muted);pointer-events:none}
+#slidectr em{color:var(--gold);font-style:normal}
+
+/* PHASE BADGE */
+#phasebadge{position:fixed;bottom:26px;left:44px;z-index:500;font-family:var(--fm);font-size:8px;letter-spacing:.22em;text-transform:uppercase;pointer-events:none;transition:color .5s,opacity .5s;opacity:0}
+
+/* STARFIELD */
+#stars{position:fixed;inset:0;z-index:0;pointer-events:none}
+
+/* Vignette for depth */
+#vig{position:fixed;inset:0;z-index:1;pointer-events:none;
+  background:radial-gradient(ellipse 75% 65% at 50% 50%, transparent 35%, rgba(2,2,10,.65) 100%)}
+
+/* FLOAT LAYERS — contained within safe margins */
+#floatlayer{
+  position:fixed;
+  /* Safe zone: never overlap center content */
+  top:60px; bottom:50px;
+  left:0; right:0;
+  pointer-events:none;
+  z-index:3;
+  overflow:hidden;
+}
+#bridgelayer{
+  position:fixed;
+  top:60px; bottom:50px;
+  left:0; right:0;
+  pointer-events:none;
+  z-index:3;
+  overflow:hidden;
+  opacity:0;
+  transition:opacity .7s;
+}
+
+/* Z VIEWPORT */
+#vp{position:fixed;top:0;left:0;width:100%;height:100%;perspective:1000px;perspective-origin:50% 50%;overflow:hidden}
+#scene{position:absolute;top:0;left:0;width:100%;height:100%;transform-style:preserve-3d;will-change:transform}
+
+/* SLIDES */
+.slide{
+  position:absolute;top:0;left:0;width:100%;height:100%;
+  display:flex;align-items:center;justify-content:center;
+  transform-style:preserve-3d;
+  opacity:0;transition:opacity .45s;
+  /* Never let content touch float zones */
+}
+.slide.vis{opacity:1}
+
+/* Content wrapper — strict containment */
+.si{
+  width:min(880px,60vw); /* narrower so floats don't collide */
+  max-height:84vh;
+  overflow:hidden;
+  display:flex;
+  flex-direction:column;
+  gap:0;
+}
+
+/* ════════════════════════════════
+   FLOAT ELEMENTS — HIGH CONTRAST
+════════════════════════════════ */
+.fhead{
+  position:absolute;
+  font-family:var(--fp);
+  pointer-events:none;
+  line-height:1.15;
+  opacity:0;
+  transform-origin:center;
+  /* text-shadow for guaranteed readability on dark */
+  text-shadow: 0 1px 8px rgba(0,0,0,.9), 0 0 20px rgba(0,0,0,.8);
+}
+.fhead .sub{
+  font-family:var(--fm);
+  display:block;
+  margin-top:5px;
+  text-shadow: 0 1px 6px rgba(0,0,0,.9);
+}
+
+.fpower{
+  position:absolute;
+  pointer-events:none;
+  line-height:1.2;
+  opacity:0;
+  white-space:nowrap;
+  text-shadow: 0 1px 8px rgba(0,0,0,.9), 0 0 16px rgba(0,0,0,.8);
+}
+
+.fbridge{
+  position:absolute;
+  pointer-events:none;
+  opacity:0;
+  transition:opacity .55s;
+  white-space:nowrap;
+  text-shadow: 0 1px 8px rgba(0,0,0,.9);
+}
+
+/* ════════════════════════════════
+   SLIDE 0 — ANTES LANDING
+════════════════════════════════ */
+.s0-eye{font-family:var(--fm);font-size:9px;letter-spacing:.28em;text-transform:uppercase;color:rgba(220,100,100,.9);margin-bottom:20px;display:block;animation:fadeUp .7s .3s both}
+.s0-h{font-family:var(--fd);font-weight:800;font-size:clamp(46px,7.5vw,100px);line-height:.9;letter-spacing:-.04em;animation:fadeUp .9s .5s both}
+.s0-h .t1{color:rgba(242,242,242,.95);display:block}  /* full opacity */
+.s0-h .t2{color:rgba(242,242,242,.95);display:block}
+.s0-h .t3{color:rgba(200,140,140,.85);display:block}
+.s0-sub{font-size:14px;font-weight:300;color:var(--muted);line-height:1.8;max-width:460px;margin-top:22px;animation:fadeUp .9s .8s both}
+.s0-cta{margin-top:38px;display:flex;align-items:center;gap:16px;animation:fadeUp .9s 1.1s both}
+.s0-btn{padding:11px 22px;background:rgba(192,48,48,.15);border:1px solid rgba(192,48,48,.6);color:rgba(220,130,130,.95);font-family:var(--fm);font-size:9px;letter-spacing:.18em;text-transform:uppercase;cursor:pointer;transition:all .25s}
+.s0-btn:hover{background:var(--red);color:var(--white)}
+.s0-hint{font-family:var(--fm);font-size:9px;letter-spacing:.13em;color:var(--muted2)}
+.bnc{animation:bounce 2.2s ease-in-out infinite;display:inline-block}
+
+/* ════════════════════════════════
+   SLIDE 1 — ANTES PROBLEMA
+════════════════════════════════ */
+.chaos-frame{border:1px solid rgba(192,48,48,.25);background:rgba(192,48,48,.05);padding:36px 44px;text-align:center}
+.cf-dl{font-family:var(--fm);font-size:8px;letter-spacing:.28em;text-transform:uppercase;color:rgba(220,100,100,.9);margin-bottom:16px;display:block}
+.cf-hl{font-family:var(--fp);font-weight:700;font-size:clamp(16px,2.6vw,32px);line-height:1.2;color:rgba(242,242,242,.95)}
+.cf-dk{font-size:12px;color:var(--muted);margin-top:10px;line-height:1.7;font-style:italic}
+.chaos-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:2px;margin-top:2px}
+.cs{background:var(--surf);padding:16px;text-align:center}
+.cs-n{font-family:var(--fd);font-size:24px;font-weight:800;color:rgba(220,90,90,.95)}
+.cs-l{font-family:var(--fm);font-size:7px;letter-spacing:.13em;color:var(--muted);margin-top:4px}
+.chaos-body{margin-top:2px;background:var(--surf);padding:18px 28px;text-align:center}
+.cb-t{font-size:12px;color:var(--muted);line-height:1.8;max-width:600px;margin:0 auto}
+.cb-t strong{color:rgba(242,242,242,.95);font-weight:600}
+
+/* ════════════════════════════════
+   SLIDE 2 — PUENTE
+════════════════════════════════ */
+.bw{display:flex;flex-direction:column;align-items:center;text-align:center;width:100%}
+.br-lbl{font-family:var(--fm);font-size:9px;letter-spacing:.28em;text-transform:uppercase;color:rgba(201,168,76,.9);margin-bottom:28px}
+.br-logo{font-family:var(--fd);font-weight:800;font-size:clamp(50px,9.5vw,120px);line-height:1;letter-spacing:-.04em;color:rgba(242,242,242,.97)}
+.br-logo em{color:var(--gold);font-style:normal}
+.br-rule{width:70px;height:1px;background:var(--gold);margin:22px auto}
+.br-sub{font-family:var(--fm);font-size:9px;letter-spacing:.22em;text-transform:uppercase;color:var(--muted)}
+.br-yr{font-family:var(--fd);font-size:17px;font-weight:700;color:var(--gold);margin-top:9px}
+
+/* ════════════════════════════════
+   SLIDE 3 — DESPUÉS LANDING
+════════════════════════════════ */
+.d-eye{font-family:var(--fm);font-size:9px;letter-spacing:.28em;text-transform:uppercase;color:rgba(201,168,76,.9);margin-bottom:20px;display:block}
+.d-h{font-family:var(--fd);font-weight:800;font-size:clamp(46px,7.5vw,100px);line-height:.9;letter-spacing:-.04em}
+.d-h .d1{color:rgba(242,242,242,.65);display:block}
+.d-h .d2{color:rgba(242,242,242,.95);display:block}
+.d-h .d3{color:var(--gold);display:block}
+.d-sub{font-size:14px;font-weight:300;color:var(--muted);line-height:1.8;max-width:460px;margin-top:22px}
+
+/* ════════════════════════════════
+   SHARED COMPONENTS
+════════════════════════════════ */
+.slbl{font-family:var(--fm);font-size:8px;letter-spacing:.26em;text-transform:uppercase;color:var(--gold);margin-bottom:12px;display:block}
+.stitle{font-family:var(--fd);font-weight:800;line-height:.95;letter-spacing:-.03em;color:rgba(242,242,242,.97);margin-bottom:10px}
+
+/* STAT GRID */
+.sg{display:grid;grid-template-columns:1fr 1fr;gap:2px}
+.sc{background:var(--surf);padding:20px 24px;border-left:2px solid transparent;transition:all .22s}
+.sc:hover{background:var(--s2);border-left-color:var(--gold)}
+.sc.hl{border-left-color:var(--gold);background:var(--s2)}
+.sc-lb{font-family:var(--fm);font-size:7px;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);margin-bottom:7px}
+.sc-n{font-family:var(--fd);font-weight:800;font-size:clamp(22px,3.4vw,46px);line-height:1;letter-spacing:-.03em;color:rgba(242,242,242,.97)}
+.sc-n.g{color:var(--gold)}
+.sc-d{font-size:10px;color:var(--muted);margin-top:5px;line-height:1.5}
+.sc-bar{height:2px;background:var(--border);margin-top:10px}
+.sc-fill{height:100%;background:var(--gold);transition:width 1.6s cubic-bezier(.16,1,.3,1)}
+
+/* ORGANS */
+.og{display:grid;grid-template-columns:1fr 1.6fr;gap:2px}
+.ol{display:flex;flex-direction:column;gap:2px}
+.ob{padding:13px 16px;background:var(--surf);border-left:2px solid transparent;cursor:pointer;transition:all .18s;text-align:left}
+.ob:hover,.ob.on{background:var(--s2);border-left-color:var(--gold)}
+.ob.on .obt{color:var(--gold)}
+.obtg{font-family:var(--fm);font-size:7px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:3px}
+.obt{font-family:var(--fd);font-size:13px;font-weight:700;color:rgba(242,242,242,.95);transition:color .18s}
+.opnl{background:var(--surf);padding:20px;border-top:2px solid var(--gold);display:flex;flex-direction:column;gap:8px}
+.op-tg{font-family:var(--fm);font-size:7px;letter-spacing:.18em;text-transform:uppercase;color:var(--gold)}
+.op-tt{font-family:var(--fd);font-size:19px;font-weight:800;color:rgba(242,242,242,.97)}
+.op-bd{font-size:10px;color:var(--muted);line-height:1.7}
+.op-st{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+.ops{background:var(--s2);padding:8px 10px;border-left:1px solid var(--border2)}
+.ops-n{font-family:var(--fd);font-size:14px;font-weight:800;color:var(--gold)}
+.ops-l{font-family:var(--fm);font-size:6px;letter-spacing:.09em;color:var(--muted);margin-top:2px}
+
+/* LOOP */
+.lss{display:flex;flex-direction:column}
+.ls{display:grid;grid-template-columns:44px 1fr;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);transition:padding-left .14s}
+.ls:hover{padding-left:6px}
+.ls:last-child{border-bottom:none}
+.ls-n{font-family:var(--fm);font-size:9px;color:var(--gold);padding-top:1px}
+.ls-t{font-family:var(--fd);font-size:12px;font-weight:700;margin-bottom:3px;color:rgba(242,242,242,.95)}
+.ls-b{font-size:9px;color:var(--muted);line-height:1.55}
+.looprow{display:flex;align-items:center;margin-top:14px;background:var(--surf);padding:10px 12px}
+.lvn{flex:1;text-align:center;padding:5px 2px;font-family:var(--fm);font-size:7px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);transition:color .18s}
+.lvn:hover{color:var(--gold)}
+.lvi{font-size:13px;display:block;margin-bottom:3px}
+.lvarr{color:var(--gold);font-size:8px;opacity:.5;animation:ap 2s ease-in-out infinite}
+
+/* REVENUE */
+.rg{display:grid;grid-template-columns:repeat(4,1fr);gap:2px;margin-bottom:2px}
+.rcard{background:var(--surf);padding:15px 13px;border-top:2px solid transparent;transition:all .22s}
+.rcard:hover{background:var(--s2);border-top-color:var(--gold)}
+.rci{font-size:16px;margin-bottom:9px}
+.rcn{font-family:var(--fd);font-size:11px;font-weight:700;color:rgba(242,242,242,.95);margin-bottom:4px}
+.rca{font-family:var(--fm);font-size:13px;font-weight:700;color:var(--gold);margin-bottom:4px}
+.rcd{font-size:9px;color:var(--muted);line-height:1.5}
+.rtot{background:var(--s2);padding:15px 22px;display:flex;align-items:center;justify-content:space-between;border-left:2px solid var(--gold)}
+.rtl{font-family:var(--fm);font-size:7px;letter-spacing:.14em;color:var(--muted)}
+.rtn{font-family:var(--fd);font-size:34px;font-weight:800;color:rgba(242,242,242,.97)}
+.rtn em{color:var(--gold);font-style:normal}
+.rtg{font-family:var(--fm);font-size:9px;color:var(--cyan);display:flex;gap:4px;align-items:center}
+
+/* ARCH */
+.als{display:flex;flex-direction:column;gap:2px}
+.al{display:grid;grid-template-columns:124px 1fr;min-height:46px}
+.all{background:var(--s2);display:flex;flex-direction:column;justify-content:center;padding:8px 13px;border-right:2px solid var(--border)}
+.alln{font-family:var(--fm);font-size:7px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.allt{font-family:var(--fd);font-size:11px;font-weight:700;margin-top:2px;color:rgba(242,242,242,.95)}
+.alc{background:var(--surf);display:flex;align-items:center;flex-wrap:wrap;padding:7px 12px;gap:5px}
+.altg{padding:3px 7px;background:var(--s2);border:1px solid var(--border2);font-family:var(--fm);font-size:7px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);transition:all .18s;cursor:default}
+.altg:hover{border-color:var(--gold);color:var(--gold)}
+
+/* CLIENT */
+.ccg{display:grid;grid-template-columns:1fr 1fr;gap:2px;margin-bottom:2px}
+.cch{font-family:var(--fd);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:9px 14px;background:var(--surf);color:var(--muted2)}
+.cch.on{color:var(--gold);border-bottom:2px solid var(--gold)}
+.ccis{display:flex;flex-direction:column;gap:2px}
+.cci{background:var(--surf);padding:9px 14px;border-left:2px solid var(--border);transition:all .18s}
+.cci.a{border-left-color:var(--gold);background:var(--s2)}
+.cci:hover{background:var(--s2)}
+.ccih{font-family:var(--fd);font-size:10px;font-weight:700;margin-bottom:3px;color:rgba(242,242,242,.95)}
+.ccib{font-size:9px;color:var(--muted);line-height:1.5}
+.cqb{padding:13px 18px;background:var(--surf);border-top:2px solid var(--gold);text-align:center}
+.cqbt{font-family:var(--fd);font-size:clamp(11px,1.5vw,16px);font-weight:700;line-height:1.3;color:rgba(242,242,242,.95)}
+.cqbt em{color:var(--gold);font-style:normal}
+
+/* ORG */
+.ow{display:flex;flex-direction:column;align-items:center;gap:0}
+.orow{display:flex;gap:5px;justify-content:center}
+.oconn{height:16px;width:1px;background:var(--border2)}
+.ocard{background:var(--surf);padding:9px 12px;text-align:center;min-width:100px;border-top:2px solid transparent;transition:all .18s;cursor:default}
+.ocard:hover,.ocard.ceo{border-top-color:var(--gold);background:var(--s2)}
+.ocard.ceo .ocr{color:var(--gold)}
+.ocav{width:22px;height:22px;border-radius:50%;background:var(--s2);margin:0 auto 5px;display:flex;align-items:center;justify-content:center;font-size:10px}
+.ocn{font-family:var(--fd);font-size:9px;font-weight:700;color:rgba(242,242,242,.95)}
+.ocr{font-family:var(--fm);font-size:6px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-top:1px}
+
+/* NEWS */
+.newsl{display:grid;grid-template-columns:1.5fr 1fr;gap:2px}
+.newsm{background:var(--surf);padding:22px;border-top:2px solid var(--red)}
+.newsmd{font-family:var(--fm);font-size:7px;letter-spacing:.14em;color:var(--gold);margin-bottom:7px}
+.newsmt{font-family:var(--fd);font-size:14px;font-weight:800;line-height:1.1;margin-bottom:7px;color:rgba(242,242,242,.97)}
+.newsmb{font-size:9px;color:var(--muted);line-height:1.65}
+.newss{display:flex;flex-direction:column;gap:2px}
+.ni{background:var(--surf);padding:11px 14px;flex:1;border-left:2px solid transparent;transition:all .18s;cursor:default}
+.ni:hover{border-left-color:var(--gold);background:var(--s2)}
+.nid{font-family:var(--fm);font-size:7px;color:var(--muted);margin-bottom:3px}
+.nit{font-family:var(--fd);font-size:9px;font-weight:700;margin-bottom:3px;color:rgba(242,242,242,.93)}
+.nitag{display:inline-block;padding:2px 5px;background:var(--gold2);color:var(--gold);font-family:var(--fm);font-size:7px;letter-spacing:.09em}
+
+/* TL */
+.tll{display:grid;grid-template-columns:1fr 1fr;gap:2px}
+.tlb{background:var(--surf);padding:15px 18px}
+.tlbt{font-family:var(--fm);font-size:8px;letter-spacing:.18em;text-transform:uppercase;color:var(--gold);margin-bottom:10px}
+.tli{display:grid;grid-template-columns:40px 1fr;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);transition:padding-left .12s}
+.tli:hover{padding-left:4px}
+.tli:last-child{border-bottom:none}
+.tly{font-family:var(--fm);font-size:9px;color:var(--gold);font-weight:700;padding-top:1px}
+.tlx{font-size:9px;color:var(--muted);line-height:1.5}
+.tlx strong{color:rgba(242,242,242,.93);font-weight:600}
+.cgg{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:4px}
+.cgi{background:var(--s2);padding:7px 9px;border-left:1px solid var(--border2)}
+.cgc{font-family:var(--fm);font-size:6px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:2px}
+.cgn{font-size:9px;color:rgba(242,242,242,.9);line-height:1.4}
+.ctag{margin-top:5px;padding:6px 9px;background:var(--gold2);border:1px solid rgba(201,168,76,.3);font-family:var(--fm);font-size:7px;color:var(--gold);letter-spacing:.09em}
+.pts{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px}
+.pt{padding:3px 7px;background:var(--s2);border:1px solid var(--border2);font-family:var(--fm);font-size:7px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);transition:all .18s}
+.pt:hover{border-color:var(--gold);color:var(--gold)}
+.pt.h{background:var(--gold2);border-color:rgba(201,168,76,.4);color:var(--gold)}
+
+/* INFO */
+.info3{display:grid;grid-template-columns:repeat(3,1fr);gap:2px;margin-bottom:2px}
+.ib{background:var(--surf);padding:16px 14px}
+.ib-ph{font-family:var(--fm);font-size:7px;letter-spacing:.16em;margin-bottom:7px;display:block}
+.ib-t{font-family:var(--fd);font-size:12px;font-weight:700;margin-bottom:5px;color:rgba(242,242,242,.95)}
+.ib-b{font-size:9px;color:var(--muted);line-height:1.6}
+.info5{display:grid;grid-template-columns:repeat(5,1fr);gap:2px}
+.i5{background:var(--s2);padding:10px;text-align:center}
+.i5t{font-family:var(--fd);font-size:9px;font-weight:700;color:var(--gold);margin-bottom:2px}
+.i5b{font-size:7px;color:var(--muted)}
+
+/* CLOSING */
+.cl{text-align:center}
+.clm{font-family:var(--fm);font-size:8px;letter-spacing:.26em;text-transform:uppercase;color:var(--gold);margin-bottom:18px;display:block}
+.clt{font-family:var(--fd);font-weight:800;font-size:clamp(30px,6.5vw,84px);line-height:.9;letter-spacing:-.04em;margin-bottom:18px}
+.clt .c1{color:rgba(242,242,242,.45);display:block}
+.clt .c2{color:rgba(242,242,242,.97);display:block}
+.clt .c3{color:var(--gold);display:block}
+.cls{font-size:12px;color:var(--muted);max-width:440px;margin:0 auto 28px;line-height:1.75;font-weight:300}
+.clf{font-family:var(--fm);font-size:8px;letter-spacing:.14em;color:var(--muted2);line-height:2}
+.clf strong{color:rgba(201,168,76,.8)}
+
+/* ANIMATIONS */
+@keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+@keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(7px)}}
+@keyframes ap{0%,100%{opacity:.4;transform:translateX(0)}50%{opacity:1;transform:translateX(3px)}}
+</style>
+</head>
+<body>
+<div id="cdot"></div>
+<div id="cring"></div>
+<div id="prog"></div>
+<div id="vig"></div>
+<div id="slidectr"><em id="scur">01</em> / 15</div>
+<div id="phasebadge"></div>
+<div id="navdots"></div>
+<div id="topnav">
+  <div class="nav-logo">Black<em>Rock</em></div>
+  <div id="nav-sname">El Sistema · IEB · ADE · 2025</div>
+</div>
+<div id="floatlayer"></div>
+<div id="bridgelayer"></div>
+<canvas id="stars"></canvas>
+
+<div id="vp"><div id="scene">
+
+<!-- 0: ANTES LANDING -->
+<div class="slide vis" data-z="0" data-name="Antes — El Caos" data-phase="antes">
+  <div class="si">
+    <span class="s0-eye">Antes de BlackRock · 1970 – 1987</span>
+    <h1 class="s0-h">
+      <span class="t1">El capital existía.</span>
+      <span class="t2">Nadie veía</span>
+      <span class="t3">el sistema.</span>
+    </h1>
+    <p class="s0-sub">El sistema financiero era un archipiélago de islas desconectadas. Bancos, fondos, aseguradoras — todos operando con información incompleta. El riesgo era invisible hasta que lo veías demasiado tarde.</p>
+    <div class="s0-cta">
+      <div class="s0-btn" id="start-btn">Entrar al sistema</div>
+      <div class="s0-hint">Scroll · ↑↓ <span class="bnc">↓</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- 1: ANTES PROBLEMA -->
+<div class="slide" data-z="1" data-name="Antes — El Problema" data-phase="antes">
+  <div class="si">
+    <div class="chaos-frame">
+      <span class="cf-dl">The Financial System · 1970s – 1987</span>
+      <div class="cf-hl">"Los mercados financieros eran poderosos — pero ciegos. Nadie podía ver el riesgo sistémico."</div>
+      <div class="cf-dk">El capital fluía sin modelo. El riesgo se medía con intuición. Cuando llegaba la crisis, el daño ya estaba hecho.</div>
+    </div>
+    <div class="chaos-stats">
+      <div class="cs"><div class="cs-n">−22.6%</div><div class="cs-l">Dow Jones · Black Monday, 19 Oct 1987</div></div>
+      <div class="cs"><div class="cs-n">$160B</div><div class="cs-l">Coste crisis S&amp;L americana · 1980s</div></div>
+      <div class="cs"><div class="cs-n">4.000+</div><div class="cs-l">Gestoras desconectadas · EE.UU., 1987</div></div>
+    </div>
+    <div class="chaos-body">
+      <div class="cb-t">Los portfolios de bonos se gestionaban por <strong>intuición y teléfono.</strong> Los modelos cuantitativos eran primitivos. No existía un sistema de riesgo en tiempo real. <strong>El capital fluía a ciegas.</strong></div>
+    </div>
+  </div>
+</div>
+
+<!-- 2: PUENTE -->
+<div class="slide" data-z="2" data-name="El Puente — 1988" data-phase="bridge">
+  <div class="si" style="align-items:center">
+    <div class="bw">
+      <div class="br-lbl">Nueva York · 1988 · El Punto de Inflexión</div>
+      <div class="br-logo">Black<em>Rock</em></div>
+      <div class="br-rule"></div>
+      <div class="br-sub">Del caos a la excelencia</div>
+      <div class="br-yr">1988 → 2025</div>
+    </div>
+  </div>
+</div>
+
+<!-- 3: DESPUÉS LANDING -->
+<div class="slide" data-z="3" data-name="Después — El Orden" data-phase="despues">
+  <div class="si">
+    <span class="d-eye">Después de BlackRock · 1988 – 2025</span>
+    <h1 class="d-h">
+      <span class="d1">El sistema</span>
+      <span class="d2">se hizo</span>
+      <span class="d3">visible.</span>
+    </h1>
+    <p class="d-sub">BlackRock no solucionó el problema del mercado. Construyó la infraestructura que permite al mundo financiero verse a sí mismo. Hoy, el riesgo global pasa por un solo sistema: Aladdin.</p>
+  </div>
+</div>
+
+<!-- 4: ESCALA -->
+<div class="slide" data-z="4" data-name="La Magnitud" data-phase="despues">
+  <div class="si">
+    <span class="slbl">01 — La Magnitud</span>
+    <h2 class="stitle" style="font-size:clamp(22px,3.8vw,50px)">Una escala sin precedentes</h2>
+    <div class="sg">
+      <div class="sc hl"><div class="sc-lb">Activos bajo gestión (AUM)</div><div class="sc-n g" data-target="14" data-sfx="T $">14T $</div><div class="sc-d">Más que el PIB de Alemania + Reino Unido + Francia.</div><div class="sc-bar"><div class="sc-fill" data-w="85" style="width:0%"></div></div></div>
+      <div class="sc"><div class="sc-lb">Activos procesados por Aladdin</div><div class="sc-n" data-target="21" data-sfx="T $">21T $</div><div class="sc-d">El sistema operativo del mercado global. 250M+ cálculos semanales.</div><div class="sc-bar"><div class="sc-fill" data-w="100" style="width:0%"></div></div></div>
+      <div class="sc"><div class="sc-lb">iShares — Plataforma ETF</div><div class="sc-n" data-target="5.5" data-sfx="T $">5.5T $</div><div class="sc-d">32% del mercado global de ETFs. Adquirida por $300B en 2009.</div><div class="sc-bar"><div class="sc-fill" data-w="40" style="width:0%"></div></div></div>
+      <div class="sc"><div class="sc-lb">Ingresos 2025 — Récord</div><div class="sc-n" data-target="24.2" data-sfx="B $">24.2B $</div><div class="sc-d">+19% YoY. Margen operativo 45%. Entradas netas $698B récord.</div><div class="sc-bar"><div class="sc-fill" data-w="60" style="width:0%"></div></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- 5: ÓRGANOS -->
+<div class="slide" data-z="5" data-name="Los Órganos del Sistema">
+  <div class="si">
+    <span class="slbl">02 — Arquitectura del Sistema</span>
+    <h2 class="stitle" style="font-size:clamp(19px,2.8vw,36px);margin-bottom:8px">Los órganos del organismo</h2>
+    <div class="og">
+      <div class="ol">
+        <div class="ob on" onclick="setOrgan(this,'aladdin')"><div class="obtg">Inteligencia</div><div class="obt">Aladdin</div></div>
+        <div class="ob" onclick="setOrgan(this,'ishares')"><div class="obtg">Distribución</div><div class="obt">iShares</div></div>
+        <div class="ob" onclick="setOrgan(this,'privados')"><div class="obtg">Rendimiento</div><div class="obt">Mercados Privados</div></div>
+        <div class="ob" onclick="setOrgan(this,'preqin')"><div class="obtg">Datos</div><div class="obt">Preqin</div></div>
+        <div class="ob" onclick="setOrgan(this,'advisory')"><div class="obtg">Integración</div><div class="obt">Advisory</div></div>
+      </div>
+      <div class="opnl" id="op"></div>
+    </div>
+  </div>
+</div>
+
+<!-- 6: LOOP -->
+<div class="slide" data-z="6" data-name="El Circuito Cerrado">
+  <div class="si">
+    <span class="slbl">03 — El Circuito Cerrado</span>
+    <h2 class="stitle" style="font-size:clamp(19px,2.8vw,36px);margin-bottom:8px">Todo está conectado</h2>
+    <div class="lss">
+      <div class="ls"><div class="ls-n">01</div><div><div class="ls-t">Los datos entran al sistema</div><div class="ls-b">Aladdin procesa millones de variables en tiempo real. Para BlackRock y para las 1.500+ instituciones que pagan por acceder.</div></div></div>
+      <div class="ls"><div class="ls-n">02</div><div><div class="ls-t">La inteligencia toma forma</div><div class="ls-b">Señales de riesgo, recomendaciones de cartera, alertas de mercado. Los gestores actúan con ventaja informacional.</div></div></div>
+      <div class="ls"><div class="ls-n">03</div><div><div class="ls-t">El producto llega al mercado global</div><div class="ls-b">iShares convierte señales en ETFs accesibles a cualquier inversor. Los mercados privados capturan el rendimiento ilíquido.</div></div></div>
+      <div class="ls"><div class="ls-n">04</div><div><div class="ls-t">El cliente retroalimenta el sistema</div><div class="ls-b">Cada decisión vuelve a Aladdin. El sistema aprende. La ventaja se compone. El foso se profundiza solo.</div></div></div>
+    </div>
+    <div class="looprow">
+      <div class="lvn"><span class="lvi">⚡</span>Datos</div><span class="lvarr">▶</span>
+      <div class="lvn"><span class="lvi">🧠</span>Decisión</div><span class="lvarr">▶</span>
+      <div class="lvn"><span class="lvi">📦</span>Producto</div><span class="lvarr">▶</span>
+      <div class="lvn"><span class="lvi">🌐</span>Distribución</div><span class="lvarr">▶</span>
+      <div class="lvn"><span class="lvi">👤</span>Cliente</div><span class="lvarr" style="color:var(--cyan)">↺</span>
+      <div class="lvn" style="color:var(--gold)"><span class="lvi">🔄</span>Retroalim.</div>
+    </div>
+  </div>
+</div>
+
+<!-- 7: MODELO -->
+<div class="slide" data-z="7" data-name="Modelo de Negocio">
+  <div class="si">
+    <span class="slbl">04 — Monetización</span>
+    <h2 class="stitle" style="font-size:clamp(19px,2.8vw,36px);margin-bottom:8px">Cuatro fuentes. Un sistema.</h2>
+    <div class="rg">
+      <div class="rcard"><div class="rci">📊</div><div class="rcn">Gestión de Activos</div><div class="rca">~$15B</div><div class="rcd">Comisiones sobre $14T en AUM. Core histórico del negocio.</div></div>
+      <div class="rcard"><div class="rci">💻</div><div class="rcn">Aladdin SaaS</div><div class="rca">$1.6B+</div><div class="rcd">Ingresos recurrentes. +16% YoY. Margen altísimo.</div></div>
+      <div class="rcard"><div class="rci">🏗️</div><div class="rcn">Mercados Privados</div><div class="rca">↑ 15%</div><div class="rcd">Mayor margen. GIP · HPS · PE · Real Assets.</div></div>
+      <div class="rcard"><div class="rci">🤝</div><div class="rcn">Advisory</div><div class="rca">Estratégico</div><div class="rcd">Gobiernos y bancos centrales. Integración sistémica.</div></div>
+    </div>
+    <div class="rtot"><div><div class="rtl">Ingresos Totales 2025 · Récord Histórico</div></div><div class="rtn">$24.2<em>B</em></div><div class="rtg"><span>▲</span><span>+19% YoY</span></div></div>
+  </div>
+</div>
+
+<!-- 8: ARQUITECTURA -->
+<div class="slide" data-z="8" data-name="Arquitectura de Red">
+  <div class="si">
+    <span class="slbl">05 — Las Capas del Sistema</span>
+    <h2 class="stitle" style="font-size:clamp(19px,2.8vw,36px);margin-bottom:8px">Arquitectura de red</h2>
+    <div class="als">
+      <div class="al"><div class="all"><span class="alln">Capa 1</span><div class="allt">Decisión</div></div><div class="alc"><span class="altg">Aladdin</span><span class="altg">Risk Analytics</span><span class="altg">Factor Models</span><span class="altg">Portfolio Construction</span><span class="altg">Stress Testing</span></div></div>
+      <div class="al"><div class="all"><span class="alln">Capa 2</span><div class="allt">Producto</div></div><div class="alc"><span class="altg">iShares ETFs</span><span class="altg">Fondos Activos</span><span class="altg">Infraestructura</span><span class="altg">Private Credit</span><span class="altg">Real Assets</span></div></div>
+      <div class="al"><div class="all"><span class="alln">Capa 3</span><div class="allt">Distribución</div></div><div class="alc"><span class="altg">Institucional</span><span class="altg">Retail</span><span class="altg">Wealth</span><span class="altg">Soberano</span><span class="altg">Aseguradoras</span><span class="altg">Pensiones</span></div></div>
+      <div class="al"><div class="all"><span class="alln">Capa 4</span><div class="allt">Datos</div></div><div class="alc"><span class="altg">Preqin</span><span class="altg">Aladdin Data</span><span class="altg">Market Intelligence</span><span class="altg">ESG Metrics</span></div></div>
+      <div class="al"><div class="all" style="border-right-color:var(--gold)"><span class="alln">Capa 5</span><div class="allt" style="color:var(--gold)">Advisory</div></div><div class="alc" style="border-top:1px solid var(--gold2)"><span class="altg">Gobiernos</span><span class="altg">Bancos Centrales</span><span class="altg">Fondos Soberanos</span><span class="altg">Policy Advisory</span></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- 9: CLIENTE -->
+<div class="slide" data-z="9" data-name="Estrategia Comercial">
+  <div class="si">
+    <span class="slbl">06 — Estrategia Comercial</span>
+    <h2 class="stitle" style="font-size:clamp(19px,2.8vw,36px);margin-bottom:8px">BlackRock no vende</h2>
+    <div class="ccg">
+      <div><div class="cch">Lo que hacen los demás</div><div class="ccis"><div class="cci"><div class="ccih">Pitch de producto</div><div class="ccib">Fondos, comisiones, rentabilidades. El cliente puede irse mañana.</div></div><div class="cci"><div class="ccih">Relación transaccional</div><div class="ccib">La relación termina cuando termina la inversión.</div></div><div class="cci"><div class="ccih">Dependencia del retorno</div><div class="ccib">Si la rentabilidad cae, el cliente se va.</div></div></div></div>
+      <div><div class="cch on">Lo que hace BlackRock</div><div class="ccis"><div class="cci a"><div class="ccih">Integración en infraestructura</div><div class="ccib">Aladdin se convierte en el sistema operativo del cliente. Sustituirlo costaría años.</div></div><div class="cci a"><div class="ccih">Dependencia estructural</div><div class="ccib">La relación es sistémica. El cliente no puede funcionar sin BlackRock.</div></div><div class="cci a"><div class="ccih">Ingresos perpetuos</div><div class="ccib">SaaS de ciclo largo. NRR >100%. Los clientes crecen dentro del sistema.</div></div></div></div>
+    </div>
+    <div class="cqb"><div class="cqbt">"No compite por los activos de sus clientes.<br><em>Se convierte en la infraestructura desde la que los gestionan.</em>"</div></div>
+  </div>
+</div>
+
+<!-- 10: ORGANIGRAMA -->
+<div class="slide" data-z="10" data-name="Liderazgo">
+  <div class="si">
+    <span class="slbl">07 — Los Arquitectos del Sistema</span>
+    <h2 class="stitle" style="font-size:clamp(19px,2.8vw,36px);margin-bottom:14px">Liderazgo</h2>
+    <div class="ow">
+      <div class="orow"><div class="ocard ceo"><div class="ocav">👤</div><div class="ocn">Larry Fink</div><div class="ocr">Chairman &amp; CEO · Cofundador</div></div></div>
+      <div class="oconn"></div>
+      <div class="orow">
+        <div class="ocard"><div class="ocav">👤</div><div class="ocn">Robert Kapito</div><div class="ocr">Presidente · Cofundador</div></div>
+        <div class="ocard"><div class="ocav">👤</div><div class="ocn">Martin Small</div><div class="ocr">CFO</div></div>
+        <div class="ocard"><div class="ocav">👤</div><div class="ocn">Rob Goldstein</div><div class="ocr">COO</div></div>
+        <div class="ocard"><div class="ocav">👤</div><div class="ocn">Mark Wiedman</div><div class="ocr">Global Client</div></div>
+      </div>
+      <div class="oconn"></div>
+      <div class="orow" style="flex-wrap:wrap;gap:4px">
+        <div class="ocard" style="min-width:98px"><div class="ocn" style="font-size:8px">iShares</div><div class="ocr">Salim Ramji</div></div>
+        <div class="ocard" style="min-width:98px"><div class="ocn" style="font-size:8px">Aladdin</div><div class="ocr">Sudhir Nair</div></div>
+        <div class="ocard" style="min-width:98px"><div class="ocn" style="font-size:8px">Mercados Privados</div><div class="ocr">Edwin Conway</div></div>
+        <div class="ocard" style="min-width:98px"><div class="ocn" style="font-size:8px">EMEA</div><div class="ocr">Rachel Lord</div></div>
+        <div class="ocard" style="min-width:98px"><div class="ocn" style="font-size:8px">APAC</div><div class="ocr">Susan Chan</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 11: NOTICIAS -->
+<div class="slide" data-z="11" data-name="Actualidad Estratégica">
+  <div class="si">
+    <span class="slbl">08 — El Sistema en Movimiento</span>
+    <h2 class="stitle" style="font-size:clamp(19px,2.8vw,36px);margin-bottom:8px">Actualidad estratégica</h2>
+    <div class="newsl">
+      <div class="newsm"><div class="newsmd">Enero 2025 · Movimiento Estratégico</div><div class="newsmt">BlackRock adquiere HPS para crear el mayor jugador de crédito privado del mundo</div><div class="newsmb">La adquisición de HPS añade ~$220B en crédito privado. Junto con GIP ($12.5B, 2024), BlackRock ejecuta la expansión más ambiciosa de su historia. El capital institucional se mueve hacia activos ilíquidos y BlackRock quiere ser la única puerta de entrada.</div></div>
+      <div class="newss">
+        <div class="ni"><div class="nid">Ene 2024</div><div class="nit">Bitcoin ETF: lanza iShares Bitcoin Trust (IBIT)</div><span class="nitag">Innovación</span></div>
+        <div class="ni"><div class="nid">2024</div><div class="nit">Adquisición de GIP por $12.5B: infraestructura global</div><span class="nitag">M&amp;A</span></div>
+        <div class="ni"><div class="nid">2023</div><div class="nit">Preqin: mayor base de datos de PE del mundo</div><span class="nitag">Datos</span></div>
+        <div class="ni"><div class="nid">2025</div><div class="nit">AUM récord $14T. Entradas netas $698B</div><span class="nitag">Resultados</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 12: CRONOLOGÍA -->
+<div class="slide" data-z="12" data-name="Cronología &amp; Clientes">
+  <div class="si">
+    <span class="slbl">09 — Del Riesgo al Sistema</span>
+    <div class="tll">
+      <div class="tlb">
+        <div class="tlbt">Hitos históricos</div>
+        <div class="tli"><div class="tly">1988</div><div class="tlx"><strong>Fundación.</strong> Larry Fink y 7 socios. $5M. Obsesión: el riesgo.</div></div>
+        <div class="tli"><div class="tly">1992</div><div class="tlx"><strong>Independencia.</strong> Nace BlackRock Inc.</div></div>
+        <div class="tli"><div class="tly">1999</div><div class="tlx"><strong>IPO NYSE.</strong> $165B en AUM.</div></div>
+        <div class="tli"><div class="tly">2006</div><div class="tlx"><strong>Merrill Lynch IM.</strong> Supera $1T en AUM.</div></div>
+        <div class="tli"><div class="tly">2009</div><div class="tlx"><strong>BGI + iShares.</strong> Número 1 mundial. $3T AUM.</div></div>
+        <div class="tli"><div class="tly">2024</div><div class="tlx"><strong>GIP + Bitcoin ETF.</strong> IBIT: mayor ETF Bitcoin del mundo.</div></div>
+        <div class="tli"><div class="tly">2025</div><div class="tlx"><strong>$14T AUM.</strong> HPS. Récord histórico de entradas.</div></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:2px">
+        <div class="tlb">
+          <div class="tlbt">Clientes &amp; Social Proof</div>
+          <div class="cgg">
+            <div class="cgi"><div class="cgc">Soberanos</div><div class="cgn">Abu Dhabi ICD · GIC · Norges</div></div>
+            <div class="cgi"><div class="cgc">Pensiones</div><div class="cgn">CalPERS · CPPIB · ATP</div></div>
+            <div class="cgi"><div class="cgc">Bancos</div><div class="cgn">Deutsche · HSBC · Goldman</div></div>
+            <div class="cgi"><div class="cgc">Aseguradoras</div><div class="cgn">Allianz · AXA · MetLife</div></div>
+          </div>
+          <div class="ctag">+1.500 instituciones usan Aladdin · 100+ países</div>
+        </div>
+        <div class="tlb">
+          <div class="tlbt">Servicios &amp; Productos</div>
+          <div class="pts">
+            <span class="pt">ETFs iShares</span><span class="pt">Aladdin SaaS</span><span class="pt">Private Equity</span>
+            <span class="pt">Infraestructura</span><span class="pt">Crédito Privado</span><span class="pt">Real Assets</span>
+            <span class="pt">Gestión Activa</span><span class="pt">Multi-Asset</span><span class="pt">Preqin Data</span>
+            <span class="pt h">Bitcoin ETF IBIT</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 13: INFOGRAFÍA -->
+<div class="slide" data-z="13" data-name="Estructura del Análisis">
+  <div class="si">
+    <span class="slbl">10 — Estructura del Análisis</span>
+    <div class="info3">
+      <div class="ib" style="border-top:2px solid var(--red)"><span class="ib-ph" style="color:rgba(220,100,100,.9)">ANTES</span><div class="ib-t">El Problema</div><div class="ib-b">Mercados fragmentados · Black Monday 1987 · Riesgo invisible · S&amp;L Crisis · Capital a ciegas</div></div>
+      <div class="ib" style="border-top:2px solid var(--gold)"><span class="ib-ph" style="color:var(--gold)">PUENTE</span><div class="ib-t">BlackRock</div><div class="ib-b">Fundación 1988 · Larry Fink · Aladdin · iShares · Sistema de gestión de riesgo global</div></div>
+      <div class="ib" style="border-top:2px solid var(--cyan)"><span class="ib-ph" style="color:var(--cyan)">DESPUÉS</span><div class="ib-t">El Sistema</div><div class="ib-b">$14T AUM · $21T Aladdin · 1.500+ instituciones · Modelo de negocio · Arquitectura global</div></div>
+    </div>
+    <div class="info5" style="margin-top:2px">
+      <div class="i5"><div class="i5t">Órganos</div><div class="i5b">Aladdin · iShares · Private · Preqin · Advisory</div></div>
+      <div class="i5"><div class="i5t">Circuito</div><div class="i5b">Datos→Decisión→Producto→Cliente</div></div>
+      <div class="i5"><div class="i5t">Modelo</div><div class="i5b">4 líneas · $24.2B récord</div></div>
+      <div class="i5"><div class="i5t">Cliente</div><div class="i5b">No vende. Se integra.</div></div>
+      <div class="i5"><div class="i5t">Liderazgo</div><div class="i5b">Fink · Kapito · Small · Goldstein</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- 14: CIERRE -->
+<div class="slide" data-z="14" data-name="Conclusión">
+  <div class="si" style="align-items:center">
+    <div class="cl">
+      <span class="clm">Conclusión · IEB · ADE · Madrid · 2025</span>
+      <h2 class="clt"><span class="c1">No es</span><span class="c2">una empresa.</span><span class="c3">Es un sistema.</span></h2>
+      <p class="cls">BlackRock construyó el único sistema que convierte datos en decisiones, decisiones en productos, productos en capital, y capital en más inteligencia — de forma perpetua.</p>
+      <div class="clf">Análisis Estratégico de Empresa · Grado ADE<br><strong>IEB — Instituto de Estudios Bursátiles · Madrid · 2025</strong><br>NYSE: BLK · $14T AUM · Fundada 1988 · Nueva York</div>
+    </div>
+  </div>
+</div>
+
+</div></div>
+
+<script>
+// ════════════════════════════════════════════════
+// ORGANS
+// ════════════════════════════════════════════════
+const ORGANS={
+  aladdin:{tag:'Sistema Operativo · Inteligencia Global',title:'Aladdin',body:'El sistema nervioso del mercado global. 1.500+ instituciones pagan por acceder. 250M+ cálculos de riesgo semanales. No es una herramienta — es infraestructura crítica del sistema financiero mundial.',stats:[['$21T','Activos procesados'],['1.500+','Clientes inst.'],['$1.6B+','Revenue anual'],['+16%','YoY']]},
+  ishares:{tag:'Distribución Global · ETFs',title:'iShares',body:'La mayor plataforma ETF del mundo. $5.5T en AUM, 32% del mercado global. Adquirida a Barclays en 2009 por $300B. Entradas netas récord de $527B en 2025.',stats:[['$5.5T','AUM'],['32%','Cuota ETF global'],['$8B+','Revenue 2025'],['$527B','Entradas récord']]},
+  privados:{tag:'Rendimiento · Mercados Alternativos',title:'Mercados Privados',body:'GIP (infraestructura global, $12.5B), HPS (crédito privado, $220B+), private equity, real estate. Mayor margen que cualquier producto líquido. La apuesta estratégica 2024-2025.',stats:[['$220B+','HPS Credit AUM'],['$12.5B','Precio GIP'],['Alta','Margen relativo'],['2024-25','Expansión clave']]},
+  preqin:{tag:'Datos · Mercados Privados',title:'Preqin',body:'La mayor base de datos del mundo sobre PE, hedge funds e infraestructura. Integrada en Aladdin, convierte a BlackRock en árbitro de la información en los mercados menos transparentes.',stats:[['$60M+','Revenue trim.'],['Global','Cobertura PE'],['Aladdin+','Integración'],['Único','Posicionamiento']]},
+  advisory:{tag:'Consultoría · Integración Sistémica',title:'Advisory',body:'Asesora a gobiernos y bancos centrales. Integra a los clientes más poderosos del mundo en el ecosistema BlackRock. Cuando un gobierno necesita estabilizar su sistema financiero, llama a BlackRock.',stats:[['Gov.','Asesoría estatal'],['FED+','Mandatos BC'],['Sistémica','Integración'],['Global','Alcance']]}
+};
+function setOrgan(el,key){
+  document.querySelectorAll('.ob').forEach(b=>b.classList.remove('on'));
+  el.classList.add('on');
+  const d=ORGANS[key];
+  document.getElementById('op').innerHTML=`<div class="op-tg">${d.tag}</div><div class="op-tt">${d.title}</div><div class="op-bd">${d.body}</div><div class="op-st">${d.stats.map(s=>`<div class="ops"><div class="ops-n">${s[0]}</div><div class="ops-l">${s[1]}</div></div>`).join('')}</div>`;
+}
+setOrgan(document.querySelector('.ob.on'),'aladdin');
+
+// ════════════════════════════════════════════════
+// FLOAT DATA — HIGH CONTRAST GUARANTEED
+// ════════════════════════════════════════════════
+const ANTES_DATA = [
+  // LEFT side — newspaper headlines
+  {side:'L',hl:'BLACK MONDAY SENDS\nDOW INTO FREEFALL',sub:'— 22.6% in a single session · Oct 19, 1987',fs:20,rot:-1.2,italic:true},
+  {side:'L',hl:'S&L CRISIS COSTS\nTAXPAYERS $160 BILLION',sub:'Washington Post · 1989',fs:15,rot:0.8,italic:false},
+  {side:'L',hl:'Continental Illinois\nCollapse Shocks Markets',sub:'The Wall Street Journal · 1984',fs:13,rot:-0.5,italic:true},
+  {side:'L',hl:'Junk Bond King\nDrexel Files Bankruptcy',sub:'New York Times · Feb 1990',fs:12,rot:1.0,italic:false},
+  {side:'L',hl:'Latin American Debt\nCrisis Deepens',sub:'Financial Times · 1982',fs:11,rot:-0.8,italic:true},
+  {side:'L',hl:'No Risk Model Can\nPredict the Next Crash',sub:'The Economist · 1986',fs:10,rot:0.5,italic:false},
+  // RIGHT side
+  {side:'R',hl:'PORTFOLIO MANAGERS\nFLY BLIND ON RISK',sub:"Barron's · October 1987",fs:19,rot:0.7,italic:true},
+  {side:'R',hl:'4,000+ Fund Houses\nWith Zero Coordination',sub:'WSJ Analysis · 1987',fs:15,rot:-1.0,italic:false},
+  {side:'R',hl:'Bond Markets Run\nOn Intuition Alone',sub:'Bloomberg · 1986',fs:13,rot:0.6,italic:true},
+  {side:'R',hl:'Capital Allocation:\nSpreadsheets and Phone Calls',sub:'Fortune Magazine · 1985',fs:12,rot:-0.5,italic:false},
+  {side:'R',hl:'Systemic Risk:\nInvisible Until Too Late',sub:'The Economist · 1988',fs:11,rot:0.9,italic:true},
+  {side:'R',hl:'Markets Fragmented:\nNo Central Intelligence',sub:'Financial Times · 1987',fs:10,rot:-0.6,italic:false},
+];
+
+const DESPUES_DATA = [
+  // LEFT — data power
+  {side:'L',hl:'$14 TRILLION AUM',sub:'BlackRock 2025 · All-time record',fs:20,color:'rgba(201,168,76,.95)',mono:true},
+  {side:'L',hl:'$21T processed\nby Aladdin',sub:'21 trillion in external assets',fs:15,color:'rgba(201,168,76,.85)',mono:true},
+  {side:'L',hl:'iShares: 32% of global ETF market',sub:'$5.5T AUM · $527B net inflows 2025',fs:12,color:'rgba(62,201,201,.85)',mono:true},
+  {side:'L',hl:'$24.2B revenues in 2025',sub:'Record · +19% year-over-year',fs:12,color:'rgba(201,168,76,.8)',mono:true},
+  {side:'L',hl:'45% operating margin',sub:'Best-in-class efficiency',fs:11,color:'rgba(62,201,201,.75)',mono:false},
+  {side:'L',hl:'1,500+ institutions\non Aladdin',sub:'In more than 100 countries',fs:10,color:'rgba(201,168,76,.7)',mono:true},
+  // RIGHT — news
+  {side:'R',hl:'BLACKROCK ACQUIRES HPS\nFOR $220B IN CREDIT',sub:'Bloomberg · January 2025',fs:19,color:'rgba(201,168,76,.95)',mono:false},
+  {side:'R',hl:"iShares Bitcoin Trust (IBIT)\nBecomes World's Largest Bitcoin ETF",sub:'Financial Times · Jan 2024',fs:13,color:'rgba(62,201,201,.88)',mono:false},
+  {side:'R',hl:'BlackRock Buys GIP for $12.5B\nEntering Global Infrastructure',sub:'WSJ · January 2024',fs:12,color:'rgba(201,168,76,.82)',mono:false},
+  {side:'R',hl:'Preqin Acquisition Closes:\nBlackRock Owns Private Markets Data',sub:'Reuters · 2024',fs:11,color:'rgba(62,201,201,.78)',mono:false},
+  {side:'R',hl:'Net inflows hit $698B —\nAll-time record for any asset manager',sub:'BlackRock Q4 2025 Earnings',fs:10,color:'rgba(201,168,76,.75)',mono:false},
+  {side:'R',hl:'Fink Letter: Long-Termism\nas Corporate Doctrine',sub:'Annual CEO Letter · 2025',fs:10,color:'rgba(62,201,201,.7)',mono:false},
+];
+
+const BRIDGE_DATA = [
+  {side:'L',text:'Larry Fink',fs:26,color:'rgba(242,242,242,.97)',w:800,f:'Syne'},
+  {side:'L',text:'Robert Kapito',fs:18,color:'rgba(242,242,242,.75)',w:700,f:'Syne'},
+  {side:'L',text:'Susan Wagner',fs:15,color:'rgba(242,242,242,.6)',w:600,f:'Syne'},
+  {side:'L',text:'Ben Golub',fs:13,color:'rgba(242,242,242,.52)',w:600,f:'Syne'},
+  {side:'L',text:'Barbara Novick',fs:12,color:'rgba(242,242,242,.46)',w:600,f:'Syne'},
+  {side:'L',text:'Ralph Schlosstein',fs:11,color:'rgba(242,242,242,.4)',w:600,f:'Syne'},
+  {side:'L',text:'Hugh Frater',fs:10,color:'rgba(242,242,242,.36)',w:600,f:'Syne'},
+  {side:'R',text:'ALADDIN',fs:28,color:'rgba(201,168,76,.97)',w:800,f:'Space Mono'},
+  {side:'R',text:'iShares',fs:22,color:'rgba(62,201,201,.9)',w:800,f:'Syne'},
+  {side:'R',text:'GIP',fs:17,color:'rgba(201,168,76,.8)',w:700,f:'Space Mono'},
+  {side:'R',text:'HPS',fs:15,color:'rgba(201,168,76,.72)',w:700,f:'Space Mono'},
+  {side:'R',text:'Preqin',fs:14,color:'rgba(62,201,201,.68)',w:700,f:'Syne'},
+  {side:'R',text:'Advisory',fs:12,color:'rgba(242,242,242,.52)',w:600,f:'Syne'},
+  {side:'R',text:'eFront',fs:10,color:'rgba(242,242,242,.4)',w:600,f:'Syne'},
+];
+
+// ════════════════════════════════════════════════
+// FLOAT ENGINE
+// ════════════════════════════════════════════════
+const FL = document.getElementById('floatlayer');
+const BL = document.getElementById('bridgelayer');
+let bridgeOn = false;
+
+function clearFL() { FL.innerHTML = ''; }
+function clearBL() {
+  if (!bridgeOn) return;
+  bridgeOn = false;
+  BL.style.opacity = '0';
+  setTimeout(() => { BL.innerHTML = ''; }, 700);
+}
+
+// Compute safe float zone: left strip and right strip
+// Center content is in 60vw centered → left and right strips are 20vw each
+function getStrip(side, progress) {
+  const W = window.innerWidth;
+  const H = window.innerHeight;
+  const stripW = W * 0.19;                  // each strip width
+  const edgeGap = 12;                        // min gap from screen edge
+  const centerGap = 8;                       // min gap from content area
+  // As progress grows 0→1, floats drift from edge toward center
+  const drift = progress * (stripW * 0.45);
+  if (side === 'L') {
+    return { left: edgeGap + drift, right: null, maxW: stripW - drift - centerGap };
+  } else {
+    return { left: null, right: edgeGap + drift, maxW: stripW - drift - centerGap };
+  }
+}
+
+function buildAntes(slideIdx) {
+  clearFL(); clearBL();
+  const progress = Math.min(slideIdx / 1, 1); // 0 or 1
+  const H = window.innerHeight;
+
+  const leftItems  = ANTES_DATA.filter(d => d.side === 'L');
+  const rightItems = ANTES_DATA.filter(d => d.side === 'R');
+
+  function place(items, side) {
+    items.forEach((item, i) => {
+      const el = document.createElement('div');
+      el.className = 'fhead';
+
+      const strip = getStrip(side, progress);
+      const scaledFs = Math.round(item.fs * (0.75 + progress * 0.45));
+      el.style.fontSize = scaledFs + 'px';
+      el.style.fontWeight = '700';
+      el.style.fontStyle = item.italic ? 'italic' : 'normal';
+      el.style.maxWidth = Math.max(60, strip.maxW) + 'px';
+      el.style.whiteSpace = 'pre-line';
+      el.style.lineHeight = '1.15';
+
+      // Color: red-tinted, never below 0.65 opacity for readability
+      const alpha = 0.65 + progress * 0.25;
+      el.style.color = `rgba(220,170,170,${alpha})`;
+      el.style.textShadow = '0 1px 10px rgba(0,0,0,.95), 0 0 24px rgba(0,0,0,.9)';
+
+      if (strip.left !== null) { el.style.left = strip.left + 'px'; el.style.textAlign = 'left'; }
+      else                     { el.style.right = strip.right + 'px'; el.style.textAlign = 'right'; }
+
+      // Vertical distribution — even spread with small jitter
+      const segH = (H - 120) / items.length;
+      const top = 70 + i * segH + (Math.random() - 0.5) * 14;
+      el.style.top = Math.max(60, top) + 'px';
+
+      el.style.transform = `rotate(${item.rot * (1 - progress * 0.6)}deg)`;
+
+      // Headline + byline
+      const hlEl = document.createElement('div');
+      hlEl.textContent = item.hl;
+
+      const subEl = document.createElement('div');
+      subEl.className = 'sub';
+      subEl.style.fontSize = Math.max(7, Math.round(scaledFs * 0.38)) + 'px';
+      subEl.style.letterSpacing = '.1em';
+      subEl.style.color = `rgba(220,170,170,${Math.max(0.45, alpha - 0.2)})`;
+      subEl.textContent = item.sub;
+
+      el.appendChild(hlEl);
+      el.appendChild(subEl);
+      FL.appendChild(el);
+
+      setTimeout(() => {
+        el.style.transition = 'opacity .5s ease';
+        el.style.opacity = '1';
+      }, i * 50 + 60);
+    });
+  }
+
+  place(leftItems, 'L');
+  place(rightItems, 'R');
+}
+
+function buildDespues(slideIdx) {
+  clearFL(); clearBL();
+  const progress = Math.min((slideIdx - 3) / 1, 1);
+  const H = window.innerHeight;
+  const leftItems  = DESPUES_DATA.filter(d => d.side === 'L');
+  const rightItems = DESPUES_DATA.filter(d => d.side === 'R');
+
+  function place(items, side) {
+    items.forEach((item, i) => {
+      const el = document.createElement('div');
+      el.className = 'fpower';
+      const strip = getStrip(side, progress);
+      const scaledFs = Math.round(item.fs * (0.75 + progress * 0.45));
+      el.style.fontSize = scaledFs + 'px';
+      el.style.fontFamily = item.mono ? "'Space Mono',monospace" : "'Playfair Display',serif";
+      el.style.fontWeight = '700';
+      el.style.maxWidth = Math.max(60, strip.maxW) + 'px';
+      el.style.whiteSpace = 'pre-line';
+      el.style.lineHeight = '1.2';
+      el.style.textShadow = '0 1px 10px rgba(0,0,0,.95), 0 0 20px rgba(0,0,0,.9)';
+
+      // Parse alpha from color string and boost it
+      const colorMatch = item.color.match(/([\d.]+)\)$/);
+      const baseAlpha = colorMatch ? parseFloat(colorMatch[1]) : 0.8;
+      const finalAlpha = Math.min(1, baseAlpha * (0.75 + progress * 0.35));
+      el.style.color = item.color.replace(/([\d.]+)\)$/, finalAlpha.toFixed(2) + ')');
+
+      if (strip.left !== null) { el.style.left = strip.left + 'px'; el.style.textAlign = 'left'; }
+      else                     { el.style.right = strip.right + 'px'; el.style.textAlign = 'right'; }
+
+      const segH = (H - 120) / items.length;
+      el.style.top = Math.max(60, 70 + i * segH + (Math.random() - 0.5) * 12) + 'px';
+
+      const hlEl = document.createElement('div');
+      hlEl.textContent = item.hl;
+      const subEl = document.createElement('div');
+      subEl.style.cssText = `font-family:var(--fm);font-size:${Math.max(7, Math.round(scaledFs * 0.38))}px;letter-spacing:.1em;color:rgba(180,180,180,.55);margin-top:4px;font-weight:400`;
+      subEl.textContent = item.sub;
+      el.appendChild(hlEl);
+      el.appendChild(subEl);
+      FL.appendChild(el);
+
+      setTimeout(() => {
+        el.style.transition = 'opacity .5s ease';
+        el.style.opacity = '1';
+      }, i * 50 + 60);
+    });
+  }
+  place(leftItems, 'L');
+  place(rightItems, 'R');
+}
+
+function buildBridge() {
+  clearFL();
+  BL.innerHTML = '';
+  bridgeOn = true;
+  const H = window.innerHeight;
+  const stripW = window.innerWidth * 0.18;
+
+  BRIDGE_DATA.forEach((item, i) => {
+    const el = document.createElement('div');
+    el.className = 'fbridge';
+    el.style.fontSize = item.fs + 'px';
+    el.style.fontWeight = item.w;
+    el.style.fontFamily = item.f === 'Space Mono' ? "'Space Mono',monospace" : "'Syne',sans-serif";
+    el.style.color = item.color;
+    el.style.textShadow = '0 1px 8px rgba(0,0,0,.9)';
+
+    const isL = item.side === 'L';
+    const sideItems = BRIDGE_DATA.filter(x => x.side === item.side);
+    const sideIdx   = sideItems.indexOf(item);
+    const segH = (H - 120) / sideItems.length;
+    el.style.top = Math.max(60, 70 + sideIdx * segH + (Math.random() - 0.5) * 14) + 'px';
+
+    if (isL) { el.style.left = '14px'; el.style.textAlign = 'left'; el.style.maxWidth = stripW + 'px'; }
+    else     { el.style.right = '14px'; el.style.textAlign = 'right'; el.style.maxWidth = stripW + 'px'; }
+
+    el.textContent = item.text;
+    BL.appendChild(el);
+    setTimeout(() => { el.style.opacity = '1'; }, i * 65 + 100);
+  });
+
+  BL.style.opacity = '1';
+}
+
+// ════════════════════════════════════════════════
+// Z-AXIS ENGINE — SMOOTH MOMENTUM
+// ════════════════════════════════════════════════
+const slides = Array.from(document.querySelectorAll('.slide'));
+const TOTAL  = slides.length;
+const Z_GAP  = 1500;
+
+// Momentum-based navigation: velocity accumulates, decays naturally
+let currentZ  = 0;
+let velocityZ  = 0;
+let targetIdx  = 0;
+let lockedNav  = false;
+
+const scene     = document.getElementById('scene');
+const progEl    = document.getElementById('prog');
+const scurEl    = document.getElementById('scur');
+const snameEl   = document.getElementById('nav-sname');
+const phaseBadge= document.getElementById('phasebadge');
+
+// Position slides
+slides.forEach((s, i) => s.style.transform = `translateZ(-${i * Z_GAP}px)`);
+
+// Nav dots
+const dotsEl = document.getElementById('navdots');
+slides.forEach((s, i) => {
+  const d = document.createElement('div');
+  d.className = 'ndot' + (i === 0 ? ' on' : '');
+  d.title = s.dataset.name || '';
+  d.addEventListener('click', () => navTo(i));
+  dotsEl.appendChild(d);
+});
+
+function navTo(idx) {
+  if (idx < 0 || idx >= TOTAL) return;
+  if (lockedNav) return;
+  lockedNav = true;
+  targetIdx = idx;
+  updateMeta(idx);
+  setTimeout(() => { lockedNav = false; }, 900);
+}
+
+function updateMeta(idx) {
+  document.querySelectorAll('.ndot').forEach((d, i) => d.classList.toggle('on', i === idx));
+  progEl.style.width = ((idx / (TOTAL - 1)) * 100) + '%';
+  scurEl.textContent = String(idx + 1).padStart(2, '0');
+  snameEl.textContent = slides[idx].dataset.name || '';
+
+  const phase = slides[idx].dataset.phase;
+  if (phase === 'antes') {
+    phaseBadge.textContent = '— Antes —';
+    phaseBadge.style.color = 'rgba(220,100,100,.8)';
+    phaseBadge.style.opacity = '1';
+    buildAntes(idx);
+  } else if (phase === 'bridge') {
+    phaseBadge.textContent = '— 1988 —';
+    phaseBadge.style.color = 'rgba(201,168,76,.8)';
+    phaseBadge.style.opacity = '1';
+    buildBridge();
+  } else if (phase === 'despues') {
+    phaseBadge.textContent = '— Después —';
+    phaseBadge.style.color = 'rgba(62,201,201,.75)';
+    phaseBadge.style.opacity = '1';
+    buildDespues(idx);
+  } else {
+    phaseBadge.style.opacity = '0';
+    clearFL(); clearBL();
+  }
+}
+
+function updateVis(z) {
+  slides.forEach((s, i) => {
+    const dist = Math.abs(z - i * Z_GAP);
+    s.classList.toggle('vis', dist < Z_GAP * 1.5);
+  });
+}
+
+// ── RENDER LOOP: spring-to-target, buttery smooth ──
+let lastT = 0;
+function loop(t) {
+  const dt = Math.min((t - lastT) / 1000, 0.05); // cap at 50ms
+  lastT = t;
+
+  const snapZ    = targetIdx * Z_GAP;
+  const distance = snapZ - currentZ;
+
+  // Spring: F = k * distance - damping * velocity
+  const k = 6.5;       // stiffness — lower = floatier
+  const damp = 7.0;    // damping — higher = less bounce
+  const acc = k * distance - damp * velocityZ;
+  velocityZ += acc * dt;
+  currentZ  += velocityZ * dt;
+
+  // Settle when very close
+  if (Math.abs(distance) < 0.5 && Math.abs(velocityZ) < 0.5) {
+    currentZ  = snapZ;
+    velocityZ = 0;
+  }
+
+  scene.style.transform = `translateZ(${currentZ}px)`;
+  updateVis(currentZ);
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+// ── WHEEL — debounced, single-step ──
+let wheelCooldown = false;
+window.addEventListener('wheel', e => {
+  e.preventDefault();
+  if (wheelCooldown) return;
+  wheelCooldown = true;
+  setTimeout(() => { wheelCooldown = false; }, 700);
+  navTo(targetIdx + (e.deltaY > 0 ? 1 : -1));
+}, { passive: false });
+
+// ── KEYBOARD ──
+window.addEventListener('keydown', e => {
+  if (e.key === 'ArrowDown' || e.key === 'ArrowRight') navTo(targetIdx + 1);
+  if (e.key === 'ArrowUp'   || e.key === 'ArrowLeft')  navTo(targetIdx - 1);
+});
+
+// ── TOUCH ──
+let ts = 0;
+window.addEventListener('touchstart', e => { ts = e.touches[0].clientY; }, { passive: true });
+window.addEventListener('touchend', e => {
+  const d = ts - e.changedTouches[0].clientY;
+  if (Math.abs(d) > 45) navTo(targetIdx + (d > 0 ? 1 : -1));
+}, { passive: true });
+
+document.getElementById('start-btn').addEventListener('click', () => navTo(1));
+updateMeta(0);
+
+// Counter animation for slide 4
+const doneCtr = new Set();
+function animCtr(el) {
+  if (doneCtr.has(el)) return; doneCtr.add(el);
+  const target = parseFloat(el.dataset.target);
+  const sfx = el.dataset.sfx || '';
+  const t0 = performance.now(), dur = 2000;
+  (function tick(now) {
+    const p = Math.min((now - t0) / dur, 1);
+    const e = 1 - Math.pow(1 - p, 3);
+    el.textContent = (Number.isInteger(target) ? Math.floor(target * e) : (target * e).toFixed(1)) + sfx;
+    if (p < 1) requestAnimationFrame(tick);
+  })(t0);
+}
+new MutationObserver(() => {
+  if (slides[4].classList.contains('vis')) {
+    slides[4].querySelectorAll('[data-target]').forEach(animCtr);
+    slides[4].querySelectorAll('.sc-fill').forEach(b => setTimeout(() => b.style.width = b.dataset.w + '%', 300));
+  }
+}).observe(slides[4], { attributes: true, attributeFilter: ['class'] });
+
+// ════════════════════════════════════════════════
+// STARFIELD
+// ════════════════════════════════════════════════
+const sf = document.getElementById('stars');
+const ctx = sf.getContext('2d');
+function rsf() { sf.width = innerWidth; sf.height = innerHeight; }
+rsf(); window.addEventListener('resize', rsf);
+
+const STARS = Array.from({ length: 300 }, () => ({
+  x: (Math.random() - .5) * 2, y: (Math.random() - .5) * 2,
+  z: Math.random(), spd: Math.random() * .0006 + .00015,
+  gold: Math.random() > .88
+}));
+
+(function drawS() {
+  ctx.clearRect(0, 0, sf.width, sf.height);
+  const cx = sf.width / 2, cy = sf.height / 2;
+  STARS.forEach(s => {
+    s.z -= s.spd;
+    if (s.z <= 0) { s.x = (Math.random()-.5)*2; s.y = (Math.random()-.5)*2; s.z = 1; }
+    const sc = 1 / s.z, px = cx + s.x * sc * sf.width * .5, py = cy + s.y * sc * sf.height * .5;
+    const r = Math.max(.2, (1 - s.z) * 2.0), a = Math.min(1, (1 - s.z) * 1.0);
+    ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI * 2);
+    ctx.fillStyle = s.gold ? `rgba(201,168,76,${a*.82})` : `rgba(210,218,255,${a*.35})`;
+    ctx.fill();
+  });
+  requestAnimationFrame(drawS);
+})();
+
+// ════════════════════════════════════════════════
+// CURSOR
+// ════════════════════════════════════════════════
+const cdot = document.getElementById('cdot'), cring = document.getElementById('cring');
+let mx = innerWidth/2, my = innerHeight/2, rx = mx, ry = my;
+document.addEventListener('mousemove', e => { mx = e.clientX; my = e.clientY; });
+(function cl() {
+  cdot.style.left = mx+'px'; cdot.style.top = my+'px';
+  rx += (mx-rx)*.1; ry += (my-ry)*.1;
+  cring.style.left = rx+'px'; cring.style.top = ry+'px';
+  requestAnimationFrame(cl);
+})();
+document.querySelectorAll('.ob,.ndot,#start-btn,.ni,.tli,.rcard').forEach(el => {
+  el.addEventListener('mouseenter', () => { cring.style.width='38px'; cring.style.height='38px'; cring.style.borderColor='rgba(201,168,76,.85)'; });
+  el.addEventListener('mouseleave', () => { cring.style.width='26px'; cring.style.height='26px'; cring.style.borderColor='rgba(201,168,76,.5)'; });
+});
+</script>
+</body>
+</html>
